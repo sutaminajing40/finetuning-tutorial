@@ -21,9 +21,9 @@ def calculate_metrics(predictions: list[int], labels: list[int]) -> MetricsResul
     """
     return MetricsResult(
         accuracy=accuracy_score(labels, predictions),
-        f1_score=f1_score(labels, predictions),
-        precision=precision_score(labels, predictions),
-        recall=recall_score(labels, predictions),
+        f1_score=f1_score(labels, predictions, average="weighted"),
+        precision=precision_score(labels, predictions, average="weighted"),
+        recall=recall_score(labels, predictions, average="weighted"),
     )
 
 
@@ -115,6 +115,12 @@ def main():
         model = ModelFactory.create_model()
         optimizer = ModelFactory.create_optimizer(model)
 
+        # 学習前の評価
+        logger.logger.info("Evaluating model before training...")
+        initial_test_metrics = evaluate(model, test_loader)
+        logger.logger.info("=== Initial Model Performance ===")
+        logger.log_test_info(initial_test_metrics)
+
         # 学習ループ
         logger.logger.info("Starting training...")
         for epoch in range(TRAIN_CONFIG.epochs):
@@ -126,10 +132,18 @@ def main():
             val_metrics = evaluate(model, val_loader)
             logger.log_validation_info(val_metrics)
 
-        # テスト
-        logger.logger.info("Evaluating on test set...")
-        test_metrics = evaluate(model, test_loader)
-        logger.log_test_info(test_metrics)
+        # 学習後のテスト
+        logger.logger.info("Evaluating model after training...")
+        final_test_metrics = evaluate(model, test_loader)
+        logger.logger.info("=== Final Model Performance ===")
+        logger.log_test_info(final_test_metrics)
+
+        # 性能改善の表示
+        logger.logger.info("=== Performance Improvement ===")
+        accuracy_improvement = final_test_metrics.accuracy - initial_test_metrics.accuracy
+        f1_improvement = final_test_metrics.f1_score - initial_test_metrics.f1_score
+        logger.logger.info(f"Accuracy improvement: {accuracy_improvement:.4f}")
+        logger.logger.info(f"F1-score improvement: {f1_improvement:.4f}")
 
         # モデルの保存
         torch.save(model.state_dict(), "models/sentiment_model.pth")
